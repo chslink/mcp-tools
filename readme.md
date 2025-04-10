@@ -5,7 +5,7 @@
 
 ### Install
 ```shell
-go install github.com/chslink/mcp-tool/cmd/mcpgen@latest
+go install github.com/chslink/mcp-tools/cmd/mcpgen@latest
 ```
 
 
