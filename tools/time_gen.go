@@ -7,12 +7,12 @@ import (
 )
 
 type GetCurrentTimeArguments struct {
-	Timezone string `json:"timezone" `
+	Timezone string `json:"timezone" jsonschema:"description= test description"`
 }
 
 var getcurrenttimeTool = gen.Tool{
 	Name:        "get_current_time",
-	Description: "IANA timezone name (e.g., 'America/New_York', 'Europe/London')",
+	Description: " IANA timezone name (e.g., 'America/New_York', 'Europe/London')",
 	Func: func(args GetCurrentTimeArguments) (*mcp_golang.ToolResponse, error) {
 		resp, err := ToolGetCurrentTime(args.Timezone)
 		return gen.ConvertMcpResp(resp, err)
@@ -20,12 +20,12 @@ var getcurrenttimeTool = gen.Tool{
 }
 
 type TestArguments struct {
-	SrcTime string `json:"src_time" `
+	SrcTime string `json:"src_time" jsonschema:"description="`
 }
 
 var testTool = gen.Tool{
 	Name:        "test",
-	Description: "xxx",
+	Description: " description=xxx",
 	Func: func(args TestArguments) (*mcp_golang.ToolResponse, error) {
 		resp, err := ToolTest(args.SrcTime)
 		return gen.ConvertMcpResp(resp, err)

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/segmentio/go-snakecase"
 )
@@ -19,6 +20,7 @@ type FunctionInfo struct {
 	Description string
 	Params      []ParamInfo
 	ReturnType  string
+	ParamsDesc  map[string]string
 }
 
 type ParamInfo struct {
@@ -46,18 +48,37 @@ func GenTool(f string) error {
 		case *ast.FuncDecl:
 			if strings.HasPrefix(x.Name.Name, "Tool") {
 				funcInfo := FunctionInfo{
-					Name: strings.TrimPrefix(x.Name.Name, "Tool"),
+					Name:       strings.TrimPrefix(x.Name.Name, "Tool"),
+					ParamsDesc: map[string]string{},
 				}
 
 				// 提取函数描述
 				if x.Doc != nil {
 					for _, comment := range x.Doc.List {
 						commentText := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
-						prefix := x.Name.Name + " description="
-						if strings.HasPrefix(commentText, prefix) {
-							funcInfo.Description = strings.TrimPrefix(commentText, prefix)
-							break
+						commentText = strings.TrimLeftFunc(commentText, func(r rune) bool {
+							return unicode.IsSpace(r)
+						})
+						if commentText != "" {
+							if strings.HasPrefix(commentText, "@") {
+								// 参数描述
+								spaceIndex := strings.Index(commentText, " ")
+								if spaceIndex > 0 {
+									funcInfo.ParamsDesc[commentText[1:spaceIndex]] = commentText[spaceIndex:]
+								}
+							} else {
+								if strings.HasPrefix(commentText, x.Name.Name) {
+									commentText = strings.TrimPrefix(commentText, x.Name.Name)
+								}
+								funcInfo.Description += commentText
+							}
+
 						}
+						//prefix := x.Name.Name + " description="
+						//if strings.HasPrefix(commentText, prefix) {
+						//	funcInfo.Description = strings.TrimPrefix(commentText, prefix)
+						//	break
+						//}
 					}
 				}
 
@@ -65,7 +86,7 @@ func GenTool(f string) error {
 				for _, field := range x.Type.Params.List {
 					paramType := getTypeName(field.Type)
 					for _, name := range field.Names {
-						paramDesc := extractParamComment(field)
+						paramDesc := extractParamComment(funcInfo, name.Name)
 						funcInfo.Params = append(funcInfo.Params, ParamInfo{
 							Name:        name.Name,
 							Type:        paramType,
@@ -114,7 +135,7 @@ import (
 {{range .Functions}}
 type {{.Name}}Arguments struct {
 	{{- range .Params}}
-	{{.Name | Title}} {{.Type}} ` + "`json:\"{{.Name | ToSnake}}\" `" + `
+	{{.Name | Title}} {{.Type}} ` + "`json:\"{{.Name | ToSnake}}\" jsonschema:\"description={{.Description}}\"`" + `
 	{{- end}}
 }
 
@@ -162,12 +183,9 @@ func getTypeName(expr ast.Expr) string {
 	}
 }
 
-func extractParamComment(field *ast.Field) string {
-	if field.Doc != nil {
-		return strings.TrimSpace(field.Doc.Text())
-	}
-	if field.Comment != nil {
-		return strings.TrimSpace(field.Comment.Text())
+func extractParamComment(funcInfo FunctionInfo, name string) string {
+	if funcInfo.ParamsDesc != nil {
+		return funcInfo.ParamsDesc[name]
 	}
 	return ""
 }

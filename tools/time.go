@@ -4,7 +4,8 @@ import (
 	"time"
 )
 
-// ToolGetCurrentTime description=IANA timezone name (e.g., 'America/New_York', 'Europe/London')
+// ToolGetCurrentTime IANA timezone name (e.g., 'America/New_York', 'Europe/London')
+// @timezone test description
 func ToolGetCurrentTime(timezone string) (string, error) {
 	var tz *time.Location
 	if timezone == "" {
