@@ -32,9 +32,13 @@ func GetTools() []Tool {
 }
 
 func ConvertMcpResp(val any, err error) (*mcp_golang.ToolResponse, error) {
+	if err == nil && val == nil {
+		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent("OK")), nil
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	if ret, ok := val.(string); ok {
 		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(ret)), nil
 	}

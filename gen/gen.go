@@ -63,8 +63,10 @@ func GenTool(f string) error {
 							if strings.HasPrefix(commentText, "@") {
 								// 参数描述
 								spaceIndex := strings.Index(commentText, " ")
+								paramName := commentText[1:spaceIndex]
+								paramName = strings.TrimSuffix(paramName, ":")
 								if spaceIndex > 0 {
-									funcInfo.ParamsDesc[commentText[1:spaceIndex]] = commentText[spaceIndex:]
+									funcInfo.ParamsDesc[paramName] = commentText[spaceIndex:]
 								}
 							} else {
 								if strings.HasPrefix(commentText, x.Name.Name) {
@@ -74,14 +76,8 @@ func GenTool(f string) error {
 							}
 
 						}
-						//prefix := x.Name.Name + " description="
-						//if strings.HasPrefix(commentText, prefix) {
-						//	funcInfo.Description = strings.TrimPrefix(commentText, prefix)
-						//	break
-						//}
 					}
 				}
-
 				// 处理参数
 				for _, field := range x.Type.Params.List {
 					paramType := getTypeName(field.Type)
@@ -131,17 +127,16 @@ import (
 	gen "github.com/chslink/mcp-tools/gen"
 )
 
-
 {{range .Functions}}
 type {{.Name}}Arguments struct {
 	{{- range .Params}}
-	{{.Name | Title}} {{.Type}} ` + "`json:\"{{.Name | ToSnake}}\" jsonschema:\"description={{.Description}}\"`" + `
+	{{.Name | Title}} {{.Type}} ` + "`json:\"{{.Name | ToSnake}}\" jsonschema:\"description={{.Description | escapeDesc}}\"`" + `
 	{{- end}}
 }
 
 var {{.Name | ToLower}}Tool = gen.Tool{
 	Name:        "{{.Name | ToSnake}}",
-	Description: "{{.Description}}",
+	Description: "{{.Description | escapeDesc}}",
 	Func: func(args {{.Name}}Arguments) (*mcp_golang.ToolResponse, error) {
 		resp, err := Tool{{.Name}}({{range $i, $p := .Params}}{{if $i}}, {{end}}args.{{$p.Name | Title}}{{end}})
 		return gen.ConvertMcpResp(resp, err)
@@ -157,11 +152,15 @@ func init(){
 `
 
 var genToolTemplate = template.Must(template.New("tool").Funcs(template.FuncMap{
-	"Title":   strings.Title,
-	"ToLower": strings.ToLower,
-	"ToSnake": snakecase.Snakecase,
+	"Title":      strings.Title,
+	"ToLower":    strings.ToLower,
+	"ToSnake":    snakecase.Snakecase,
+	"escapeDesc": escapeDesc, // 注册转义函数
 }).Parse(toolTemplate))
 
+func escapeDesc(s string) string {
+	return strings.ReplaceAll(s, `"`, `\"`)
+}
 func generateCode(data TemplateData) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
 	err := genToolTemplate.Execute(buf, data)
@@ -178,11 +177,17 @@ func getTypeName(expr ast.Expr) string {
 		return "*" + getTypeName(t.X)
 	case *ast.ArrayType:
 		return "[]" + getTypeName(t.Elt)
+	case *ast.MapType: // 新增map类型处理
+		return "map[" + getTypeName(t.Key) + "]" + getTypeName(t.Value)
+	case *ast.InterfaceType: // 处理接口类型
+		if t.Methods == nil || len(t.Methods.List) == 0 {
+			return "any"
+		}
+		return "interface{}"
 	default:
 		return "interface{}"
 	}
 }
-
 func extractParamComment(funcInfo FunctionInfo, name string) string {
 	if funcInfo.ParamsDesc != nil {
 		return funcInfo.ParamsDesc[name]
